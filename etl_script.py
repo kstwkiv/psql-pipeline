@@ -1,4 +1,5 @@
 import psycopg2
+import os
 import pandas as pd
 
 def extract_from_postgresql(query, connection_params):
@@ -22,11 +23,11 @@ def load_to_csv(df, output_path):
 
 if __name__ == "__main__":
     connection_params = {
-        'host': 'localhost',
-        'database': 'postgres',
-        'user': 'postgres',
-        'password': '2004',  # Replace with your password
-        'port': 5432
+        'host': os.environ.get('PG_HOST', 'localhost'),
+        'database': os.environ.get('PG_DATABASE', 'postgres'),
+        'user': os.environ.get('PG_USERNAME', 'postgres'),
+        'password': os.environ.get('PG_PASSWORD', ''),
+        'port': int(os.environ.get('PG_PORT', 5432))
     }
 
     tables = ['categories', 'customers', 'orders', 'products']
@@ -37,4 +38,5 @@ if __name__ == "__main__":
         df_extracted = extract_from_postgresql(query, connection_params)
         df_transformed = transform_data(df_extracted)
         load_to_csv(df_transformed, f"{table}_output.csv")
-print("ETL process completed. Data exported to output.csv")
+
+    print("ETL process completed. Data exported to output.csv")
