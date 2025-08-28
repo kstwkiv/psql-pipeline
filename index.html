@@ -1,0 +1,417 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>PostgreSQL Data Pipeline Dashboard</title>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+        }
+        
+        body {
+            background: linear-gradient(135deg, #1a2a6c, #b21f1f, #fdbb2d);
+            color: #333;
+            min-height: 100vh;
+            padding: 20px;
+        }
+        
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+        }
+        
+        header {
+            text-align: center;
+            margin-bottom: 30px;
+            padding: 20px;
+            background: rgba(255, 255, 255, 0.9);
+            border-radius: 10px;
+            box-shadow: 0 5px 15px rgba(0, 0, 0, 0.2);
+        }
+        
+        h1 {
+            color: #2c3e50;
+            margin-bottom: 10px;
+        }
+        
+        .subtitle {
+            color: #7f8c8d;
+            font-size: 1.2rem;
+        }
+        
+        .dashboard {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 20px;
+            margin-bottom: 30px;
+        }
+        
+        .card {
+            background: rgba(255, 255, 255, 0.95);
+            border-radius: 10px;
+            padding: 20px;
+            box-shadow: 0 5px 15px rgba(0, 0, 0, 0.1);
+        }
+        
+        .card h2 {
+            color: #3498db;
+            margin-bottom: 15px;
+            padding-bottom: 10px;
+            border-bottom: 2px solid #f0f0f0;
+        }
+        
+        .pipeline {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin: 30px 0;
+            position: relative;
+        }
+        
+        .step {
+            text-align: center;
+            width: 180px;
+            padding: 20px;
+            background: white;
+            border-radius: 10px;
+            box-shadow: 0 5px 15px rgba(0, 0, 0, 0.1);
+            z-index: 2;
+        }
+        
+        .step i {
+            font-size: 2.5rem;
+            margin-bottom: 10px;
+            color: #3498db;
+        }
+        
+        .step-number {
+            display: inline-block;
+            width: 30px;
+            height: 30px;
+            background: #3498db;
+            color: white;
+            border-radius: 50%;
+            line-height: 30px;
+            margin-right: 10px;
+        }
+        
+        .connector {
+            position: absolute;
+            top: 50%;
+            height: 3px;
+            background: white;
+            z-index: 1;
+        }
+        
+        .connector-1 {
+            left: 180px;
+            width: calc(100% - 180px * 2);
+        }
+        
+        .data-table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-top: 15px;
+        }
+        
+        .data-table th, .data-table td {
+            padding: 12px 15px;
+            text-align: left;
+            border-bottom: 1px solid #ddd;
+        }
+        
+        .data-table th {
+            background-color: #3498db;
+            color: white;
+        }
+        
+        .data-table tr:nth-child(even) {
+            background-color: #f9f9f9;
+        }
+        
+        .data-table tr:hover {
+            background-color: #f1f1f1;
+        }
+        
+        .controls {
+            display: flex;
+            justify-content: center;
+            gap: 15px;
+            margin-top: 20px;
+        }
+        
+        button {
+            padding: 12px 25px;
+            border: none;
+            border-radius: 5px;
+            background: #3498db;
+            color: white;
+            font-weight: bold;
+            cursor: pointer;
+            transition: background 0.3s;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+        
+        button:hover {
+            background: #2980b9;
+        }
+        
+        button.secondary {
+            background: #2ecc71;
+        }
+        
+        button.secondary:hover {
+            background: #27ae60;
+        }
+        
+        .status {
+            margin-top: 20px;
+            padding: 15px;
+            border-radius: 5px;
+            background: #f8f9fa;
+            display: none;
+        }
+        
+        .status.success {
+            display: block;
+            background: #d4edda;
+            color: #155724;
+            border: 1px solid #c3e6cb;
+        }
+        
+        .status.error {
+            display: block;
+            background: #f8d7da;
+            color: #721c24;
+            border: 1px solid #f5c6cb;
+        }
+        
+        .logs {
+            margin-top: 20px;
+            padding: 15px;
+            background: #2c3e50;
+            color: #ecf0f1;
+            border-radius: 5px;
+            max-height: 200px;
+            overflow-y: auto;
+            font-family: monospace;
+        }
+        
+        .log-entry {
+            margin-bottom: 8px;
+            padding-bottom: 8px;
+            border-bottom: 1px solid #3a506b;
+        }
+        
+        .log-time {
+            color: #3498db;
+            margin-right: 10px;
+        }
+        
+        @media (max-width: 900px) {
+            .dashboard {
+                grid-template-columns: 1fr;
+            }
+            
+            .pipeline {
+                flex-direction: column;
+                gap: 20px;
+            }
+            
+            .connector {
+                display: none;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <header>
+            <h1>PostgreSQL Data Pipeline Dashboard</h1>
+            <p class="subtitle">Monitor and manage your ETL pipeline with PostgreSQL and pgAdmin 4</p>
+        </header>
+        
+        <div class="pipeline">
+            <div class="step">
+                <i class="fas fa-database"></i>
+                <h3><span class="step-number">1</span>Extract</h3>
+                <p>Data extraction from source</p>
+            </div>
+            
+            <div class="connector connector-1"></div>
+            
+            <div class="step">
+                <i class="fas fa-cogs"></i>
+                <h3><span class="step-number">2</span>Transform</h3>
+                <p>Data processing & cleaning</p>
+            </div>
+            
+            <div class="connector connector-1"></div>
+            
+            <div class="step">
+                <i class="fas fa-table"></i>
+                <h3><span class="step-number">3</span>Load</h3>
+                <p>Load to PostgreSQL</p>
+            </div>
+        </div>
+        
+        <div class="dashboard">
+            <div class="card">
+                <h2><i class="fas fa-info-circle"></i> Pipeline Information</h2>
+                <p>This dashboard demonstrates a complete ETL (Extract, Transform, Load) pipeline with PostgreSQL.</p>
+                
+                <div class="info-list">
+                    <p><strong>Current Status:</strong> <span class="status-indicator">Active</span></p>
+                    <p><strong>PostgreSQL Version:</strong> 14.5</p>
+                    <p><strong>Last Run:</strong> <span id="last-run">2023-11-08 14:30:22</span></p>
+                    <p><strong>Next Run:</strong> <span id="next-run">2023-11-08 15:30:00</span></p>
+                </div>
+                
+                <div class="controls">
+                    <button onclick="runPipeline()">
+                        <i class="fas fa-play"></i> Run Pipeline
+                    </button>
+                    <button class="secondary" onclick="refreshData()">
+                        <i class="fas fa-sync-alt"></i> Refresh Data
+                    </button>
+                </div>
+                
+                <div id="status-message" class="status"></div>
+            </div>
+            
+            <div class="card">
+                <h2><i class="fas fa-table"></i> Sample Data</h2>
+                <p>Recently processed data in your PostgreSQL database:</p>
+                
+                <table class="data-table">
+                    <thead>
+                        <tr>
+                            <th>ID</th>
+                            <th>Name</th>
+                            <th>Value</th>
+                            <th>Status</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <tr>
+                            <td>1025</td>
+                            <td>Customer_A</td>
+                            <td>$245.67</td>
+                            <td>Processed</td>
+                        </tr>
+                        <tr>
+                            <td>1026</td>
+                            <td>Customer_B</td>
+                            <td>$387.90</td>
+                            <td>Processed</td>
+                        </tr>
+                        <tr>
+                            <td>1027</td>
+                            <td>Customer_C</td>
+                            <td>$156.23</td>
+                            <td>Pending</td>
+                        </tr>
+                        <tr>
+                            <td>1028</td>
+                            <td>Customer_D</td>
+                            <td>$498.12</td>
+                            <td>Processed</td>
+                        </tr>
+                        <tr>
+                            <td>1029</td>
+                            <td>Customer_E</td>
+                            <td>$321.45</td>
+                            <td>Failed</td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+        </div>
+        
+        <div class="card">
+            <h2><i class="fas fa-terminal"></i> Pipeline Logs</h2>
+            <div class="logs">
+                <div class="log-entry">
+                    <span class="log-time">14:30:22</span> Pipeline execution started
+                </div>
+                <div class="log-entry">
+                    <span class="log-time">14:31:05</span> Extracted 245 records from source
+                </div>
+                <div class="log-entry">
+                    <span class="log-time">14:32:17</span> Transformation completed successfully
+                </div>
+                <div class="log-entry">
+                    <span class="log-time">14:33:42</span> Loaded 242 records to PostgreSQL
+                </div>
+                <div class="log-entry">
+                    <span class="log-time">14:33:42</span> 3 records failed validation checks
+                </div>
+                <div class="log-entry">
+                    <span class="log-time">14:34:01</span> Pipeline execution finished
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        function runPipeline() {
+            const statusElement = document.getElementById('status-message');
+            statusElement.textContent = 'Pipeline executed successfully! Data has been processed and loaded into PostgreSQL.';
+            statusElement.className = 'status success';
+            
+            // Add a new log entry
+            const logs = document.querySelector('.logs');
+            const now = new Date();
+            const timeString = now.getHours() + ':' + now.getMinutes() + ':' + now.getSeconds();
+            
+            const logEntry = document.createElement('div');
+            logEntry.className = 'log-entry';
+            logEntry.innerHTML = `<span class="log-time">${timeString}</span> Manual pipeline execution completed`;
+            
+            logs.appendChild(logEntry);
+            logs.scrollTop = logs.scrollHeight;
+            
+            // Update last run time
+            document.getElementById('last-run').textContent = now.getFullYear() + '-' + 
+                (now.getMonth()+1).toString().padStart(2, '0') + '-' + 
+                now.getDate().toString().padStart(2, '0') + ' ' + timeString;
+        }
+        
+        function refreshData() {
+            const statusElement = document.getElementById('status-message');
+            statusElement.textContent = 'Data refreshed successfully! Connected to PostgreSQL via pgAdmin 4.';
+            statusElement.className = 'status success';
+            
+            // Add a new log entry
+            const logs = document.querySelector('.logs');
+            const now = new Date();
+            const timeString = now.getHours() + ':' + now.getMinutes() + ':' + now.getSeconds();
+            
+            const logEntry = document.createElement('div');
+            logEntry.className = 'log-entry';
+            logEntry.innerHTML = `<span class="log-time">${timeString}</span> Data refresh from PostgreSQL completed`;
+            
+            logs.appendChild(logEntry);
+            logs.scrollTop = logs.scrollHeight;
+        }
+        
+        // Update the next run time to be one hour from now
+        document.addEventListener('DOMContentLoaded', function() {
+            const now = new Date();
+            const nextRun = new Date(now.getTime() + 60 * 60 * 1000);
+            const timeString = nextRun.getHours() + ':' + nextRun.getMinutes().toString().padStart(2, '0') + ':' + nextRun.getSeconds().toString().padStart(2, '0');
+            
+            document.getElementById('next-run').textContent = nextRun.getFullYear() + '-' + 
+                (nextRun.getMonth()+1).toString().padStart(2, '0') + '-' + 
+                nextRun.getDate().toString().padStart(2, '0') + ' ' + timeString;
+        });
+    </script>
+</body>
+</html>
